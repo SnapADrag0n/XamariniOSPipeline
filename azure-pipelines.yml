@@ -1,0 +1,60 @@
+pool:
+  vmImage: 'macOS-12'
+  demands:
+  - MSBuild
+
+steps:
+- task: InstallAppleCertificate@2
+  displayName: 'Install an Apple certificate'
+  inputs:
+    certSecureFile: 'APSConsumerApp_Ad_Hoc_2023_01_30.p12'
+    certPwd: '$(P12password)'
+    keychain: 'temp'
+
+- task: InstallAppleProvisioningProfile@1
+  displayName: 'Install an Apple provisioning profile'
+  inputs:
+    provisioningProfileLocation: 'secureFiles'
+    provProfileSecureFile: 'APSConsumerApp_Ad_Hoc_2023_01_30_NonProd.mobileprovision'
+
+- task: UseDotNet@2
+  displayName: 'Add .NET Version'
+  inputs:
+    packageType: 'sdk'
+    version: 6.0.x
+
+- task: Bash@3
+  displayName: 'Restore Workloads'
+  inputs:
+    targetType: 'inline'
+    script: |
+      dotnet nuget locals all --clear
+      dotnet workload restore --source https://pkgs.dev.azure.com/dnceng/public/_packaging/dotnet7/nuget/v3/index.json --source https://api.nuget.org/v3/index.json
+
+- task: NuGetToolInstaller@1
+  displayName: 'Add NuGet'
+  inputs:
+    versionSpec: 6.7.x
+
+- task: Bash@3
+  displayName: 'Restore Nuget'
+  inputs:
+    targetType: 'inline'
+    script: |
+      dotnet restore PipelineDemo.sln
+
+- task: Bash@3
+  displayName: 'Build iOS App'
+  inputs:
+    targetType: 'inline'
+    script: |
+      cd iOSApp
+      dotnet publish -f net6.0-ios -c Release
+
+#- task: XamariniOS@2
+#  displayName: 'Build iOS App'
+#  inputs:
+#    solutionFile: iOSApp/iOSApp.csproj
+#    configuration: Release
+#    buildForSimulator: false
+#    packageApp: true
